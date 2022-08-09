@@ -1,0 +1,671 @@
+type: edu
+files:
+- name: src/recipes/RecipesApplication.java
+  visible: true
+  text: |+
+    package recipes;
+
+
+
+    import lombok.AllArgsConstructor;
+    import lombok.Data;
+    import lombok.NoArgsConstructor;
+    import org.springframework.boot.SpringApplication;
+    import org.springframework.boot.autoconfigure.SpringBootApplication;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.web.bind.annotation.*;
+
+    import java.util.Collections;
+    import java.util.HashMap;
+    import java.util.Map;
+
+    @SpringBootApplication
+    public class RecipesApplication {
+
+        public static void main(String[] args) {
+            SpringApplication.run(RecipesApplication.class, args);
+        }
+
+
+
+        @RestController
+        public static class recipesController {
+
+            Recipes recipes = new Recipes();
+
+            Integer id = 0;
+            HashMap<Integer, Recipes> recipeBook = new HashMap<>();
+
+
+
+            @PostMapping("/api/recipe/new")
+            public Map<String, Integer> recipePost(@RequestBody Recipes recipes) {
+                id++;
+                this.recipes = recipes;
+                recipeBook.put(id, recipes);
+
+                return Collections.singletonMap("id", id);
+            }
+
+            @GetMapping("/api/recipe/{id}")
+            public Recipes recipeGet(@PathVariable Integer id) {
+                if (recipeBook.containsKey(id)) {
+                   return recipeBook.get(id);
+                }
+                throw new RecipesNotFoundException("404 (Not found)");
+
+            }
+
+            @ResponseStatus(code = HttpStatus.NOT_FOUND)
+            class RecipesNotFoundException extends RuntimeException {
+                public RecipesNotFoundException(String cause) {
+                    super(cause);
+                }
+            }
+        }
+
+        @Data
+        @AllArgsConstructor
+        @NoArgsConstructor
+        public static class Recipes {
+            private String name;
+            private String description;
+            private String[] ingredients;
+            private String[] directions;
+        }
+    }
+
+  learner_created: false
+- name: src/resources/application.properties
+  visible: true
+  text: |-
+    server.port=8881
+    management.endpoints.web.exposure.include=*
+    management.endpoint.shutdown.enabled=true
+    server.error.include-message=always
+  learner_created: false
+- name: build.gradle
+  visible: true
+  text: |-
+    buildscript {
+        apply plugin: 'hyperskill'
+
+        repositories {
+            mavenCentral()
+        }
+        dependencies {
+            classpath "org.springframework.boot:spring-boot-gradle-plugin:$hs.spring.bootVersion"
+            classpath "io.spring.gradle:dependency-management-plugin:$hs.spring.dependencyManagementVersion"
+        }
+    }
+
+    apply plugin: 'java'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+
+    repositories {
+        mavenCentral()
+    }
+
+    sourceSets.main.resources.srcDirs = ["src/resources"]
+
+    dependencies {
+        implementation 'org.springframework.boot:spring-boot-starter'
+        implementation 'org.springframework.boot:spring-boot-starter-actuator'
+        implementation 'org.springframework.boot:spring-boot-starter-web'
+    }
+  learner_created: false
+- name: test/RecipesApplicationTest.java
+  visible: false
+  text: |
+    import com.google.gson.Gson;
+    import org.hyperskill.hstest.dynamic.DynamicTest;
+    import org.hyperskill.hstest.dynamic.input.DynamicTesting;
+    import org.hyperskill.hstest.exception.outcomes.UnexpectedError;
+    import org.hyperskill.hstest.exception.outcomes.WrongAnswer;
+    import org.hyperskill.hstest.mocks.web.response.HttpResponse;
+    import org.hyperskill.hstest.stage.SpringTest;
+    import org.hyperskill.hstest.testcase.CheckResult;
+
+    import static org.hyperskill.hstest.testing.expect.json.JsonChecker.*;
+    import static org.hyperskill.hstest.testing.expect.Expectation.expect;
+
+    import recipes.RecipesApplication;
+
+    import java.util.ArrayList;
+    import java.util.Arrays;
+    import java.util.List;
+
+    import static org.hyperskill.hstest.testcase.CheckResult.correct;
+
+
+    public class RecipesApplicationTest extends SpringTest {
+
+        public RecipesApplicationTest() {
+            super(RecipesApplication.class, "../recipes_db.mv.db");
+        }
+
+        // Initialization ---
+
+        static class Recipe {
+            final String name;
+            final String description;
+            final String[] ingredients;
+            final String[] directions;
+
+            Recipe(String name, String description, String[] ingredients, String[] directions) {
+                this.name = name;
+                this.description = description;
+                this.ingredients = ingredients;
+                this.directions = directions;
+            }
+        }
+
+        final Recipe[] RECIPES = {
+            new Recipe(
+                "Fresh Mint Tea /Test",
+                "Light, aromatic and refreshing beverage, ... /Test",
+                new String[]{"boiled water", "honey", "fresh mint leaves /Test"},
+                new String[]{"Boil water", "Pour boiling hot water into a mug", "Add fresh mint leaves", "Mix and let the mint leaves seep for 3-5 minutes", "Add honey and mix again /Test"}
+            ),
+
+            new Recipe(
+                "Warming Ginger Tea /Test",
+                "Ginger tea is a warming drink for cool weather, ... /Test",
+                new String[]{"1 inch ginger root, minced", "1/2 lemon, juiced", "1/2 teaspoon manuka honey /Test"},
+                new String[]{"Place all ingredients in a mug and fill with warm water (not too hot so you keep the beneficial honey compounds in tact)", "Steep for 5-10 minutes", "Drink and enjoy /Test"}
+            )
+        };
+
+        final Recipe[] INCORRECT_RECIPES = {
+            new Recipe(
+                null,
+                "Light, aromatic and refreshing beverage, ...",
+                new String[]{"boiled water", "honey", "fresh mint leaves"},
+                new String[]{"Boil water", "Pour boiling hot water into a mug", "Add fresh mint leaves", "Mix and let the mint leaves seep for 3-5 minutes", "Add honey and mix again"}
+            ),
+
+            new Recipe(
+                "Warming Ginger Tea",
+                null,
+                new String[]{"1 inch ginger root, minced", "1/2 lemon, juiced", "1/2 teaspoon manuka honey"},
+                new String[]{"Place all ingredients in a mug and fill with warm water (not too hot so you keep the beneficial honey compounds in tact)", "Steep for 5-10 minutes", "Drink and enjoy"}
+            ),
+
+            new Recipe(
+                "Fresh Mint Tea",
+                "Light, aromatic and refreshing beverage, ...",
+                null,
+                new String[]{"Boil water", "Pour boiling hot water into a mug", "Add fresh mint leaves", "Mix and let the mint leaves seep for 3-5 minutes", "Add honey and mix again"}
+            ),
+
+            new Recipe(
+                "Warming Ginger Tea",
+                "Ginger tea is a warming drink for cool weather, ...",
+                new String[]{"1 inch ginger root, minced", "1/2 lemon, juiced", "1/2 teaspoon manuka honey"},
+                null
+            ),
+
+            new Recipe(
+                "  ",
+                "Light, aromatic and refreshing beverage, ...",
+                new String[]{"boiled water", "honey", "fresh mint leaves"},
+                new String[]{"Boil water", "Pour boiling hot water into a mug", "Add fresh mint leaves", "Mix and let the mint leaves seep for 3-5 minutes", "Add honey and mix again"}
+            ),
+
+            new Recipe(
+                "Warming Ginger Tea",
+                "  ",
+                new String[]{"1 inch ginger root, minced", "1/2 lemon, juiced", "1/2 teaspoon manuka honey"},
+                new String[]{"Place all ingredients in a mug and fill with warm water (not too hot so you keep the beneficial honey compounds in tact)", "Steep for 5-10 minutes", "Drink and enjoy"}
+            ),
+
+            new Recipe(
+                "Fresh Mint Tea",
+                "Light, aromatic and refreshing beverage, ...",
+                new String[]{},
+                new String[]{"Boil water", "Pour boiling hot water into a mug", "Add fresh mint leaves", "Mix and let the mint leaves seep for 3-5 minutes", "Add honey and mix again"}
+            ),
+
+            new Recipe(
+                "Warming Ginger Tea",
+                "Ginger tea is a warming drink for cool weather, ...",
+                new String[]{"1 inch ginger root, minced", "1/2 lemon, juiced", "1/2 teaspoon manuka honey"},
+                new String[]{}
+            )
+        };
+
+
+        final String[] JSON_RECIPES = toJson(RECIPES);
+        final String[] JSON_INCORRECT_RECIPES = toJson(INCORRECT_RECIPES);
+
+        final String API_RECIPE_NEW = "/api/recipe/new";
+        final String API_RECIPE = "/api/recipe/";
+
+        // recipes ids will be saved when testing POST requests and used later to test GET/DELETE requests
+        final List<Integer> recipeIds = new ArrayList<>();
+
+
+        // Helper functions ---
+
+        static String[] toJson(Object[] objects) {
+            final Gson gson = new Gson();
+            return Arrays
+                .stream(objects)
+                .map(gson::toJson)
+                .toArray(String[]::new);
+        }
+
+        static void throwIfIncorrectStatusCode(HttpResponse response, int status) {
+            if (response.getStatusCode() != status) {
+                throw new WrongAnswer(response.getRequest().getMethod() +
+                    " " + response.getRequest().getLocalUri() +
+                    " should respond with status code " + status +
+                    ", responded: " + response.getStatusCode() + "\n\n" +
+                    "Response body:\n" + response.getContent());
+            }
+        }
+
+        CheckResult reloadServer() {
+            try {
+                reloadSpring();
+            } catch (Exception e) {
+                throw new UnexpectedError(e.getMessage());
+            }
+
+            return correct();
+        }
+
+
+        // Tests ---
+
+        @DynamicTest
+        DynamicTesting[] dt = new DynamicTesting[]{
+            () -> testPostRecipe(JSON_RECIPES[0]),
+            () -> testPostRecipe(JSON_RECIPES[1]),
+
+            () -> testGetRecipe(recipeIds.get(0), RECIPES[0]),
+            () -> testGetRecipe(recipeIds.get(1), RECIPES[1]),
+            this::reloadServer,
+            () -> testGetRecipe(recipeIds.get(0), RECIPES[0]),
+            () -> testGetRecipe(recipeIds.get(1), RECIPES[1]),
+
+            () -> testDeleteRecipe(recipeIds.get(0)),
+
+            () -> testDeleteRecipeNotFoundStatusCode(recipeIds.get(0)),
+            () -> testGetRecipeNotFoundStatusCode(recipeIds.get(0)),
+
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[0]),
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[1]),
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[2]),
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[3]),
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[4]),
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[5]),
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[6]),
+            () -> testPostIncorrectRecipeStatusCode(JSON_INCORRECT_RECIPES[7])
+        };
+
+        CheckResult testPostRecipe(String jsonRecipe) {
+
+            HttpResponse response = post(API_RECIPE_NEW, jsonRecipe).send();
+
+            throwIfIncorrectStatusCode(response, 200);
+
+            expect(response.getContent()).asJson().check(
+                isObject()
+                    .value("id", isInteger(recipeId -> {
+                        recipeIds.add(recipeId);
+                        return true;
+                    })));
+
+            return correct();
+        }
+
+        CheckResult testGetRecipe(int recipeId, Recipe recipe) {
+
+            HttpResponse response = get(API_RECIPE + recipeId).send();
+
+            throwIfIncorrectStatusCode(response, 200);
+
+            expect(response.getContent()).asJson().check(
+                isObject()
+                    .value("name", isString(recipe.name))
+                    .value("description", isString(recipe.description))
+                    .value("ingredients", isArray(recipe.ingredients))
+                    .value("directions", isArray(recipe.directions)));
+
+            return correct();
+        }
+
+        CheckResult testDeleteRecipe(int recipeId) {
+            HttpResponse response = delete(API_RECIPE + recipeId).send();
+
+            throwIfIncorrectStatusCode(response, 204);
+
+            return correct();
+        }
+
+        CheckResult testDeleteRecipeNotFoundStatusCode(int recipeId) {
+            HttpResponse response = delete(API_RECIPE + recipeId).send();
+
+            throwIfIncorrectStatusCode(response, 404);
+
+            return correct();
+        }
+
+        CheckResult testGetRecipeNotFoundStatusCode(int recipeId) {
+            HttpResponse response = get(API_RECIPE + recipeId).send();
+
+            throwIfIncorrectStatusCode(response, 404);
+
+            return correct();
+        }
+
+        CheckResult testPostIncorrectRecipeStatusCode(String incorrectJsonRecipe) {
+            HttpResponse response = post(API_RECIPE_NEW, incorrectJsonRecipe).send();
+
+            throwIfIncorrectStatusCode(response, 400);
+
+            return correct();
+        }
+    }
+  learner_created: false
+- name: src/recipes/buisnessLayer/Recipe.java
+  visible: true
+  learner_created: true
+- name: src/recipes/buisnessLayer/RecipeService.java
+  visible: true
+  learner_created: true
+- name: src/recipes/buisnessLayer/Repository/RecipeRepository.java
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/13090#comment
+status: Failed
+feedback:
+  message: "Exception in test #1\n\nCannot start Spring application\n\norg.springframework.beans.factory.BeanCreationException:\
+    \ Error creating bean with name &#39;entityManagerFactory&#39; defined in class\
+    \ path resource [org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaConfiguration.class]:\
+    \ Invocation of init method failed; nested exception is org.hibernate.service.spi.ServiceException:\
+    \ Unable to create requested service [org.hibernate.engine.jdbc.env.spi.JdbcEnvironment]\r\
+    \n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1804)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:620)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:542)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:335)\r\
+    \n\tat org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:333)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:208)\r\
+    \n\tat org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1154)\r\
+    \n\tat org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:908)\r\
+    \n\tat org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:583)\r\
+    \n\tat org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:145)\r\
+    \n\tat org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)\r\
+    \n\tat org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:434)\r\
+    \n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:338)\r\
+    \n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)\r\
+    \n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1332)\r\
+    \n\tat recipes.RecipesApplication.main(RecipesApplication.java:24)\n\nPlease find\
+    \ below the output of your program during this failed test.\n\n---\n\n[last 250\
+    \ lines of output are shown, 238 skipped]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:176)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:129)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:100)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:60)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:133)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:71)\
+    \ ~[na:na]\n\tat worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)\
+    \ ~[gradle-worker.jar:na]\n\tat worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)\
+    \ ~[gradle-worker.jar:na]\n\n2022-08-03 14:17:40.770  WARN 4776 --- [    Test\
+    \ worker] o.h.e.j.e.i.JdbcEnvironmentInitiator     : HHH000342: Could not obtain\
+    \ connection to query metadata\n\norg.postgresql.util.PSQLException: ВАЖНО: по\
+    льзователь &quot;postgre&quot; не прошёл проверку подлинности (по паролю) (pgjdbc:\
+    \ autodetected server-encoding to be windows-1251, if the message is not readable,\
+    \ please check database logs and/or host, port, dbname, user, password, pg_hba.conf)\n\
+    \tat org.postgresql.core.v3.ConnectionFactoryImpl.doAuthentication(ConnectionFactoryImpl.java:613)\
+    \ ~[postgresql-42.2.24.jar:42.2.24]\n\tat org.postgresql.core.v3.ConnectionFactoryImpl.tryConnect(ConnectionFactoryImpl.java:161)\
+    \ ~[postgresql-42.2.24.jar:42.2.24]\n\tat org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:213)\
+    \ ~[postgresql-42.2.24.jar:42.2.24]\n\tat org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:51)\
+    \ ~[postgresql-42.2.24.jar:42.2.24]\n\tat org.postgresql.jdbc.PgConnection.&lt;init&gt;(PgConnection.java:225)\
+    \ ~[postgresql-42.2.24.jar:42.2.24]\n\tat org.postgresql.Driver.makeConnection(Driver.java:465)\
+    \ ~[postgresql-42.2.24.jar:42.2.24]\n\tat org.postgresql.Driver.connect(Driver.java:264)\
+    \ ~[postgresql-42.2.24.jar:42.2.24]\n\tat com.zaxxer.hikari.util.DriverDataSource.getConnection(DriverDataSource.java:138)\
+    \ ~[HikariCP-4.0.3.jar:na]\n\tat com.zaxxer.hikari.pool.PoolBase.newConnection(PoolBase.java:364)\
+    \ ~[HikariCP-4.0.3.jar:na]\n\tat com.zaxxer.hikari.pool.PoolBase.newPoolEntry(PoolBase.java:206)\
+    \ ~[HikariCP-4.0.3.jar:na]\n\tat com.zaxxer.hikari.pool.HikariPool.createPoolEntry(HikariPool.java:476)\
+    \ ~[HikariCP-4.0.3.jar:na]\n\tat com.zaxxer.hikari.pool.HikariPool.checkFailFast(HikariPool.java:561)\
+    \ ~[HikariCP-4.0.3.jar:na]\n\tat com.zaxxer.hikari.pool.HikariPool.&lt;init&gt;(HikariPool.java:115)\
+    \ ~[HikariCP-4.0.3.jar:na]\n\tat com.zaxxer.hikari.HikariDataSource.getConnection(HikariDataSource.java:112)\
+    \ ~[HikariCP-4.0.3.jar:na]\n\tat org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl.getConnection(DatasourceConnectionProviderImpl.java:122)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess.obtainConnection(JdbcEnvironmentInitiator.java:180)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator.initiateService(JdbcEnvironmentInitiator.java:68)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator.initiateService(JdbcEnvironmentInitiator.java:35)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.registry.internal.StandardServiceRegistryImpl.initiateService(StandardServiceRegistryImpl.java:101)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.createService(AbstractServiceRegistryImpl.java:263)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.initializeService(AbstractServiceRegistryImpl.java:237)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.getService(AbstractServiceRegistryImpl.java:214)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.id.factory.internal.DefaultIdentifierGeneratorFactory.injectServices(DefaultIdentifierGeneratorFactory.java:152)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.injectDependencies(AbstractServiceRegistryImpl.java:286)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.initializeService(AbstractServiceRegistryImpl.java:243)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.getService(AbstractServiceRegistryImpl.java:214)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.internal.InFlightMetadataCollectorImpl.&lt;init&gt;(InFlightMetadataCollectorImpl.java:176)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.model.process.spi.MetadataBuildingProcess.complete(MetadataBuildingProcess.java:127)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl.metadata(EntityManagerFactoryBuilderImpl.java:1224)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl.build(EntityManagerFactoryBuilderImpl.java:1255)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.springframework.orm.jpa.vendor.SpringHibernateJpaPersistenceProvider.createContainerEntityManagerFactory(SpringHibernateJpaPersistenceProvider.java:58)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean.createNativeEntityManagerFactory(LocalContainerEntityManagerFactoryBean.java:365)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.AbstractEntityManagerFactoryBean.buildNativeEntityManagerFactory(AbstractEntityManagerFactoryBean.java:409)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.AbstractEntityManagerFactoryBean.afterPropertiesSet(AbstractEntityManagerFactoryBean.java:396)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean.afterPropertiesSet(LocalContainerEntityManagerFactoryBean.java:341)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.lambda$invokeInitMethods$5(AbstractAutowireCapableBeanFactory.java:1854)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:712)\
+    \ ~[na:na]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1853)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1800)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:620)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:542)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:335)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:333)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:208)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1154)\
+    \ ~[spring-context-5.3.12.jar:5.3.12]\n\tat org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:908)\
+    \ ~[spring-context-5.3.12.jar:5.3.12]\n\tat org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:583)\
+    \ ~[spring-context-5.3.12.jar:5.3.12]\n\tat org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:145)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:434)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:338)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1332)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat recipes.RecipesApplication.main(RecipesApplication.java:24)\
+    \ ~[main/:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native\
+    \ Method) ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\
+    \ ~[na:na]\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:568) ~[na:na]\n\
+    \tat org.hyperskill.hstest.stage.SpringTest.startSpring(SpringTest.java:139) ~[hs-test-release-SNAPSHOT.jar:na]\n\
+    \tat org.hyperskill.hstest.stage.SpringTest.launchSpring(SpringTest.java:50) ~[hs-test-release-SNAPSHOT.jar:na]\n\
+    \tat org.hyperskill.hstest.testing.runner.SpringApplicationRunner.launchSpringBootApplication(SpringApplicationRunner.java:20)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat org.hyperskill.hstest.testing.runner.SpringApplicationRunner.setUp(SpringApplicationRunner.java:35)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat org.hyperskill.hstest.testing.TestRun.setUp(TestRun.java:70)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat org.hyperskill.hstest.stage.StageTest.start(StageTest.java:111)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native\
+    \ Method) ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\
+    \ ~[na:na]\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:568) ~[na:na]\n\
+    \tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.run(ParentRunner.java:413)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.runTestClass(JUnitTestClassExecutor.java:110)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.execute(JUnitTestClassExecutor.java:58)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.execute(JUnitTestClassExecutor.java:38)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.junit.AbstractJUnitTestClassProcessor.processTestClass(AbstractJUnitTestClassProcessor.java:62)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.SuiteTestClassProcessor.processTestClass(SuiteTestClassProcessor.java:51)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native\
+    \ Method) ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\
+    \ ~[na:na]\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:568) ~[na:na]\n\
+    \tat org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:36)\
+    \ ~[na:na]\n\tat org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:24)\
+    \ ~[na:na]\n\tat org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)\
+    \ ~[na:na]\n\tat org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:94)\
+    \ ~[na:na]\n\tat jdk.proxy1/jdk.proxy1.$Proxy2.processTestClass(Unknown Source)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:176)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:129)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:100)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:60)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:133)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:71)\
+    \ ~[na:na]\n\tat worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)\
+    \ ~[gradle-worker.jar:na]\n\tat worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)\
+    \ ~[gradle-worker.jar:na]\n\n2022-08-03 14:17:40.795 ERROR 4776 --- [    Test\
+    \ worker] j.LocalContainerEntityManagerFactoryBean : Failed to initialize JPA\
+    \ EntityManagerFactory: Unable to create requested service [org.hibernate.engine.jdbc.env.spi.JdbcEnvironment]\n\
+    2022-08-03 14:17:40.795  WARN 4776 --- [    Test worker] ConfigServletWebServerApplicationContext\
+    \ : Exception encountered during context initialization - cancelling refresh attempt:\
+    \ org.springframework.beans.factory.BeanCreationException: Error creating bean\
+    \ with name &#39;entityManagerFactory&#39; defined in class path resource [org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaConfiguration.class]:\
+    \ Invocation of init method failed; nested exception is org.hibernate.service.spi.ServiceException:\
+    \ Unable to create requested service [org.hibernate.engine.jdbc.env.spi.JdbcEnvironment]\n\
+    2022-08-03 14:17:40.795  INFO 4776 --- [    Test worker] o.apache.catalina.core.StandardService\
+    \   : Stopping service [Tomcat]\n2022-08-03 14:17:40.826  INFO 4776 --- [    Test\
+    \ worker] ConditionEvaluationReportLoggingListener : \n\nError starting ApplicationContext.\
+    \ To display the conditions report re-run your application with &#39;debug&#39;\
+    \ enabled.\n2022-08-03 14:17:40.857 ERROR 4776 --- [    Test worker] o.s.boot.SpringApplication\
+    \               : Application run failed\n\norg.springframework.beans.factory.BeanCreationException:\
+    \ Error creating bean with name &#39;entityManagerFactory&#39; defined in class\
+    \ path resource [org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaConfiguration.class]:\
+    \ Invocation of init method failed; nested exception is org.hibernate.service.spi.ServiceException:\
+    \ Unable to create requested service [org.hibernate.engine.jdbc.env.spi.JdbcEnvironment]\n\
+    \tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1804)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:620)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:542)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:335)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:333)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:208)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.context.support.AbstractApplicationContext.getBean(AbstractApplicationContext.java:1154)\
+    \ ~[spring-context-5.3.12.jar:5.3.12]\n\tat org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:908)\
+    \ ~[spring-context-5.3.12.jar:5.3.12]\n\tat org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:583)\
+    \ ~[spring-context-5.3.12.jar:5.3.12]\n\tat org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:145)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:434)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:338)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1332)\
+    \ ~[spring-boot-2.5.6.jar:2.5.6]\n\tat recipes.RecipesApplication.main(RecipesApplication.java:24)\
+    \ ~[main/:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native\
+    \ Method) ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\
+    \ ~[na:na]\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:568) ~[na:na]\n\
+    \tat org.hyperskill.hstest.stage.SpringTest.startSpring(SpringTest.java:139) ~[hs-test-release-SNAPSHOT.jar:na]\n\
+    \tat org.hyperskill.hstest.stage.SpringTest.launchSpring(SpringTest.java:50) ~[hs-test-release-SNAPSHOT.jar:na]\n\
+    \tat org.hyperskill.hstest.testing.runner.SpringApplicationRunner.launchSpringBootApplication(SpringApplicationRunner.java:20)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat org.hyperskill.hstest.testing.runner.SpringApplicationRunner.setUp(SpringApplicationRunner.java:35)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat org.hyperskill.hstest.testing.TestRun.setUp(TestRun.java:70)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat org.hyperskill.hstest.stage.StageTest.start(StageTest.java:111)\
+    \ ~[hs-test-release-SNAPSHOT.jar:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native\
+    \ Method) ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\
+    \ ~[na:na]\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:568) ~[na:na]\n\
+    \tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.junit.runners.ParentRunner.run(ParentRunner.java:413)\
+    \ ~[junit-4.13.2.jar:4.13.2]\n\tat org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.runTestClass(JUnitTestClassExecutor.java:110)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.execute(JUnitTestClassExecutor.java:58)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.execute(JUnitTestClassExecutor.java:38)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.junit.AbstractJUnitTestClassProcessor.processTestClass(AbstractJUnitTestClassProcessor.java:62)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.SuiteTestClassProcessor.processTestClass(SuiteTestClassProcessor.java:51)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native\
+    \ Method) ~[na:na]\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\
+    \ ~[na:na]\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\
+    \ ~[na:na]\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:568) ~[na:na]\n\
+    \tat org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:36)\
+    \ ~[na:na]\n\tat org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:24)\
+    \ ~[na:na]\n\tat org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)\
+    \ ~[na:na]\n\tat org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:94)\
+    \ ~[na:na]\n\tat jdk.proxy1/jdk.proxy1.$Proxy2.processTestClass(Unknown Source)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:176)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:129)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:100)\
+    \ ~[na:na]\n\tat org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:60)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:133)\
+    \ ~[na:na]\n\tat org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:71)\
+    \ ~[na:na]\n\tat worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)\
+    \ ~[gradle-worker.jar:na]\n\tat worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)\
+    \ ~[gradle-worker.jar:na]\nCaused by: org.hibernate.service.spi.ServiceException:\
+    \ Unable to create requested service [org.hibernate.engine.jdbc.env.spi.JdbcEnvironment]\n\
+    \tat org.hibernate.service.internal.AbstractServiceRegistryImpl.createService(AbstractServiceRegistryImpl.java:275)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.initializeService(AbstractServiceRegistryImpl.java:237)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.getService(AbstractServiceRegistryImpl.java:214)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.id.factory.internal.DefaultIdentifierGeneratorFactory.injectServices(DefaultIdentifierGeneratorFactory.java:152)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.injectDependencies(AbstractServiceRegistryImpl.java:286)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.initializeService(AbstractServiceRegistryImpl.java:243)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.getService(AbstractServiceRegistryImpl.java:214)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.internal.InFlightMetadataCollectorImpl.&lt;init&gt;(InFlightMetadataCollectorImpl.java:176)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.model.process.spi.MetadataBuildingProcess.complete(MetadataBuildingProcess.java:127)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl.metadata(EntityManagerFactoryBuilderImpl.java:1224)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl.build(EntityManagerFactoryBuilderImpl.java:1255)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.springframework.orm.jpa.vendor.SpringHibernateJpaPersistenceProvider.createContainerEntityManagerFactory(SpringHibernateJpaPersistenceProvider.java:58)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean.createNativeEntityManagerFactory(LocalContainerEntityManagerFactoryBean.java:365)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.AbstractEntityManagerFactoryBean.buildNativeEntityManagerFactory(AbstractEntityManagerFactoryBean.java:409)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.AbstractEntityManagerFactoryBean.afterPropertiesSet(AbstractEntityManagerFactoryBean.java:396)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean.afterPropertiesSet(LocalContainerEntityManagerFactoryBean.java:341)\
+    \ ~[spring-orm-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.lambda$invokeInitMethods$5(AbstractAutowireCapableBeanFactory.java:1854)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat java.base/java.security.AccessController.doPrivileged(AccessController.java:712)\
+    \ ~[na:na]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1853)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1800)\
+    \ ~[spring-beans-5.3.12.jar:5.3.12]\n\t... 70 common frames omitted\nCaused by:\
+    \ org.hibernate.boot.registry.selector.spi.StrategySelectionException: Unable\
+    \ to resolve name [org.hibernate.dialect.PostgreSQL14Dialect] as strategy [org.hibernate.dialect.Dialect]\n\
+    \tat org.hibernate.boot.registry.selector.internal.StrategySelectorImpl.selectStrategyImplementor(StrategySelectorImpl.java:156)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.registry.selector.internal.StrategySelectorImpl.resolveStrategy(StrategySelectorImpl.java:239)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.registry.selector.internal.StrategySelectorImpl.resolveDefaultableStrategy(StrategySelectorImpl.java:183)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.registry.selector.internal.StrategySelectorImpl.resolveDefaultableStrategy(StrategySelectorImpl.java:170)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.registry.selector.internal.StrategySelectorImpl.resolveStrategy(StrategySelectorImpl.java:164)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl.constructDialect(DialectFactoryImpl.java:74)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.engine.jdbc.dialect.internal.DialectFactoryImpl.buildDialect(DialectFactoryImpl.java:51)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator.initiateService(JdbcEnvironmentInitiator.java:137)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator.initiateService(JdbcEnvironmentInitiator.java:35)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.registry.internal.StandardServiceRegistryImpl.initiateService(StandardServiceRegistryImpl.java:101)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.service.internal.AbstractServiceRegistryImpl.createService(AbstractServiceRegistryImpl.java:263)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\t... 89 common frames omitted\n\
+    Caused by: org.hibernate.boot.registry.classloading.spi.ClassLoadingException:\
+    \ Unable to load class [org.hibernate.dialect.PostgreSQL14Dialect]\n\tat org.hibernate.boot.registry.classloading.internal.ClassLoaderServiceImpl.classForName(ClassLoaderServiceImpl.java:133)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat org.hibernate.boot.registry.selector.internal.StrategySelectorImpl.selectStrategyImplementor(StrategySelectorImpl.java:152)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\t... 99 common frames omitted\n\
+    Caused by: java.lang.ClassNotFoundException: Could not load requested class :\
+    \ org.hibernate.dialect.PostgreSQL14Dialect\n\tat org.hibernate.boot.registry.classloading.internal.AggregatedClassLoader.findClass(AggregatedClassLoader.java:210)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\tat java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:587)\
+    \ ~[na:na]\n\tat java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:520)\
+    \ ~[na:na]\n\tat java.base/java.lang.Class.forName0(Native Method) ~[na:na]\n\t\
+    at java.base/java.lang.Class.forName(Class.java:467) ~[na:na]\n\tat org.hibernate.boot.registry.classloading.internal.ClassLoaderServiceImpl.classForName(ClassLoaderServiceImpl.java:130)\
+    \ ~[hibernate-core-5.4.32.Final.jar:5.4.32.Final]\n\t... 100 common frames omitted"
+  time: Wed, 03 Aug 2022 11:17:41 UTC
+record: -1

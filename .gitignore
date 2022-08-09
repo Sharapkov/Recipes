@@ -1,0 +1,4 @@
+# Project exclude paths
+/.gradle/
+/Recipes/task/out/
+/Recipes/task/out/production/classes/
