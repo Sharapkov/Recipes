@@ -1,3 +1,1 @@
-# Recipes
-client-server application
-user registration coming soon
+ Challenging project from https://hyperskill.org
